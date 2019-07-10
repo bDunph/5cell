@@ -19,10 +19,11 @@ bool load_shader(const char* filename, const char* &string){
 	size_t size = ftell(f);
 
 	//calloc() initialises memory to zero
-	string = (const char*)calloc(sizeof(char), size);
+	string = (const char*)calloc(sizeof(char), size + 1);
 
 	rewind(f);
 	fread((void*)string, sizeof(char), size, f);
+	*(string + size + 1) = "\0";
 	printf("%s\n", string);
 	return true;
 }

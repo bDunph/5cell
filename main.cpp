@@ -7,6 +7,7 @@
 #include <ctime>
 #include <assert.h>
 #include <math.h>
+#include <iostream>
 
 #include "log.h"
 #include "shader_manager.h"
@@ -83,26 +84,34 @@ int main(){
 	glDisable(GL_CULL_FACE);
 
 	/* specify 4D coordinates of 5-cell from https://en.wikipedia.org/wiki/5-cell */
-	float vertices [20] = {
+	/*float vertices [20] = {
 		2.0, 0.0, 0.0, 0.0,
 		0.0, 2.0, 0.0, 0.0,
 		0.0, 0.0, 2.0, 0.0,
 		0.0, 0.0, 0.0, 2.0,
 		GOLDRATIO, GOLDRATIO, GOLDRATIO, GOLDRATIO
+	};*/
+	float vertices [20] = {
+		1.0f/sqrt(10.0f), 1.0f/sqrt(6.0f), 1.0f/sqrt(3.0f), 1.0f,
+		1.0f/sqrt(10.0f), 1.0f/sqrt(6.0f), 1.0f/sqrt(3.0f), -1.0f,
+		1.0f/sqrt(10.0f), 1.0f/sqrt(6.0f), -2.0f/sqrt(3.0f), 0.0f,
+		1.0f/sqrt(10.0f), -sqrt(3.0f/2.0f), 0.0f, 0.0f,
+		-2.0f * sqrt(2.0f/5.0f), 0.0f, 0.0f, 0.0f
 	};
 
 	/* indices specifying 10 faces */
 	unsigned int indices [30] = {
-		0, 2, 1,
-		0, 1, 3,
-		0, 3, 2,
-		2, 1, 3,
-		3, 2, 4,
-		4, 2, 1,
-		4, 1, 3,
-		3, 4, 0,
-		0, 2, 4,
-		4, 1, 0		
+		0, 1, 2,
+		2, 3, 0,
+		0, 3, 1,
+		1, 3, 2,
+		2, 3, 4,
+		4, 3, 1,
+		1, 2, 4,
+		4, 2, 0,
+		0, 1, 4,
+		4, 3, 0
+		
 	};
 
 	//array of verts
@@ -194,6 +203,7 @@ int main(){
 	for(int i = 0; i < _countof(vertArray); i++){
 		glm::vec4 cumulativeNormals = glm::vec4(0.0);
 		for(int j = 0; j < _countof(faceArray); j++){
+				std::cout << "HERE!" << std::endl;
 			//does this face [j] contain vert [i]?
 			unsigned int vertA = faceArray[j].x;				 
 			unsigned int vertB = faceArray[j].y;
@@ -242,7 +252,7 @@ int main(){
 	if(!isVertLoaded) return 1;
 
 	const char* fragment_shader;
-	bool isFragLoaded = load_shader("rasterPolychoron.frag", fragment_shader);
+	bool isFragLoaded = load_shader("5cell.frag", fragment_shader);
 	if(!isFragLoaded) return 1;
 
 	GLuint vs = glCreateShader(GL_VERTEX_SHADER);
@@ -281,21 +291,24 @@ int main(){
 	GLint modelMatLoc = glGetUniformLocation(shader_program, "modelMat");
 	
 	//view matrix setup
-	glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 1.5f);
+	//glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 1.5f);
 	glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
-	glm::vec3 cameraDirection = glm::normalize(cameraPos - cameraTarget);
+	//glm::vec3 cameraDirection = glm::normalize(cameraPos - cameraTarget);
 
 	glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-	glm::vec3 cameraRight = glm::normalize(glm::cross(up, cameraDirection));
+	//glm::vec3 cameraRight = glm::normalize(glm::cross(up, cameraDirection));
 	
-	glm::vec3 cameraUp = glm::cross(cameraDirection, cameraRight);
+	//glm::vec3 cameraUp = glm::cross(cameraDirection, cameraRight);
 
-	viewMatrix = glm::lookAt(cameraPos, cameraTarget, cameraUp);	
+	//viewMatrix = glm::lookAt(cameraPos, cameraTarget, cameraUp);	
 
 	//model matrix
 	modelMatrix = glm::mat4(1.0);
 
-	//uniform for generic.frag
+	//uniforms
+	GLint lightPosLoc = glGetUniformLocation(shader_program, "lightPos");
+	glm::vec3 lightPos = glm::vec3(0.0, 1.0, 0.0); 
+
 	//GLint colour = glGetUniformLocation(shader_program, "inputColour");
 	//glUseProgram(shader_program);
 	//glUniform4f(colour, 0.5f, 0.0f, 0.5f, 1.0f);
@@ -317,11 +330,12 @@ int main(){
 	//workaround for macOS Mojave bug
 	bool needDraw = true;
 
+	float radius = 0.5f;
+
 	while(!glfwWindowShouldClose(window)){
 
 		_update_fps_counter(window);
 
-		glClearColor(0.89, 0.82, 0.79, 1.0);
 		//wipe the drawing surface clear
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		//resize openGL elements
@@ -329,6 +343,9 @@ int main(){
 
 		/* draw stuff here */
 		
+		float camX = sin(glfwGetTime()) * radius;
+		float camZ = cos(glfwGetTime()) * radius;
+		viewMatrix = glm::lookAt(glm::vec3(camX, 0.0f, camZ), cameraTarget, up);
 
 		glUseProgram(shader_program);
 		// glUniform1f(glGetUniformLocation(shader_program, "iGlobalTime"), global_time);
@@ -336,6 +353,7 @@ int main(){
 		glUniformMatrix4fv(projMatLoc, 1, GL_FALSE, &projectionMatrix[0][0]);
 		glUniformMatrix4fv(viewMatLoc, 1, GL_FALSE, &viewMatrix[0][0]);
 		glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, &modelMatrix[0][0]);
+		glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
 
 		glBindVertexArray(vao);
 		// draw 5-cell using index buffer
