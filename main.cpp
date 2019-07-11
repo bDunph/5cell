@@ -81,6 +81,8 @@ int main(){
 	//tell GL only to draw onto a pixel if a shape is closer to the viewer
 	glEnable(GL_DEPTH_TEST); //enable depth testing
 	glDepthFunc(GL_LESS); //depth testing interprets a smaller value as "closer"
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_CULL_FACE);
 
 	/* specify 4D coordinates of 5-cell from https://en.wikipedia.org/wiki/5-cell */
@@ -91,26 +93,33 @@ int main(){
 		0.0, 0.0, 0.0, 2.0,
 		GOLDRATIO, GOLDRATIO, GOLDRATIO, GOLDRATIO
 	};*/
-	float vertices [20] = {
+	/*float vertices [20] = {
 		1.0f/sqrt(10.0f), 1.0f/sqrt(6.0f), 1.0f/sqrt(3.0f), 1.0f,
 		1.0f/sqrt(10.0f), 1.0f/sqrt(6.0f), 1.0f/sqrt(3.0f), -1.0f,
 		1.0f/sqrt(10.0f), 1.0f/sqrt(6.0f), -2.0f/sqrt(3.0f), 0.0f,
 		1.0f/sqrt(10.0f), -sqrt(3.0f/2.0f), 0.0f, 0.0f,
 		-2.0f * sqrt(2.0f/5.0f), 0.0f, 0.0f, 0.0f
+	};*/
+	float vertices [20] = {
+		0.3162f, 0.4082f, 0.5774f, 1.0f,
+		0.3162f, 0.4082f, 0.5774f, -1.0f,
+		0.3162f, 0.4082f, -1.1547, 0.0f,
+		0.3162f, -1.2247f, 0.0f, 0.0f,
+		-1.2649f, 0.0f, 0.0f, 0.0f
 	};
 
 	/* indices specifying 10 faces */
 	unsigned int indices [30] = {
-		0, 1, 2,
-		2, 3, 0,
-		0, 3, 1,
-		1, 3, 2,
-		2, 3, 4,
+		0, 2, 1,
+		0, 1, 3,
+		3, 0, 2,
+		2, 1, 3,
+		3, 2, 4,
 		4, 3, 1,
 		1, 2, 4,
-		4, 2, 0,
-		0, 1, 4,
-		4, 3, 0
+		4, 0, 1,
+		4, 0, 3,
+		4, 0, 2
 		
 	};
 
@@ -203,7 +212,7 @@ int main(){
 	for(int i = 0; i < _countof(vertArray); i++){
 		glm::vec4 cumulativeNormals = glm::vec4(0.0);
 		for(int j = 0; j < _countof(faceArray); j++){
-				std::cout << "HERE!" << std::endl;
+				
 			//does this face [j] contain vert [i]?
 			unsigned int vertA = faceArray[j].x;				 
 			unsigned int vertB = faceArray[j].y;
@@ -247,12 +256,12 @@ int main(){
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 30 * sizeof(unsigned int), indices, GL_STATIC_DRAW);
 
 	//load shaders
-	const char* vertex_shader;
+	char* vertex_shader;
 	bool isVertLoaded = load_shader("rasterPolychoron.vert", vertex_shader);
 	if(!isVertLoaded) return 1;
 
-	const char* fragment_shader;
-	bool isFragLoaded = load_shader("5cell.frag", fragment_shader);
+	char* fragment_shader;
+	bool isFragLoaded = load_shader("rasterPolychoron.frag", fragment_shader);
 	if(!isFragLoaded) return 1;
 
 	GLuint vs = glCreateShader(GL_VERTEX_SHADER);
@@ -289,25 +298,36 @@ int main(){
 	GLint projMatLoc = glGetUniformLocation(shader_program, "projMat");
 	GLint viewMatLoc = glGetUniformLocation(shader_program, "viewMat");
 	GLint modelMatLoc = glGetUniformLocation(shader_program, "modelMat");
-	
+	GLint rotationZWLoc = glGetUniformLocation(shader_program, "rotZW");
+	GLint scaleMatLoc = glGetUniformLocation(shader_program, "scaleMat");	
 	//view matrix setup
-	//glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 1.5f);
+	glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, -1.0f);
 	glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
-	//glm::vec3 cameraDirection = glm::normalize(cameraPos - cameraTarget);
+	glm::vec3 cameraDirection = glm::normalize(cameraPos - cameraTarget);
 
 	glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-	//glm::vec3 cameraRight = glm::normalize(glm::cross(up, cameraDirection));
+	glm::vec3 cameraRight = glm::normalize(glm::cross(up, cameraDirection));
 	
-	//glm::vec3 cameraUp = glm::cross(cameraDirection, cameraRight);
+	glm::vec3 cameraUp = glm::cross(cameraDirection, cameraRight);
 
-	//viewMatrix = glm::lookAt(cameraPos, cameraTarget, cameraUp);	
+	viewMatrix = glm::lookAt(cameraPos, cameraTarget, cameraUp);	
 
 	//model matrix
-	modelMatrix = glm::mat4(1.0);
+	modelMatrix = glm::mat4(1.0f);
+
+	//scale matrix
+	glm::mat4 scaleMatrix = glm::mat4(
+		5.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 5.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 5.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	);
 
 	//uniforms
 	GLint lightPosLoc = glGetUniformLocation(shader_program, "lightPos");
-	glm::vec3 lightPos = glm::vec3(0.0, 1.0, 0.0); 
+	glm::vec3 lightPos = glm::vec3(0.0, 1.0, -1.0); 
+
+	GLint cameraPosLoc = glGetUniformLocation(shader_program, "camPos");
 
 	//GLint colour = glGetUniformLocation(shader_program, "inputColour");
 	//glUseProgram(shader_program);
@@ -330,12 +350,13 @@ int main(){
 	//workaround for macOS Mojave bug
 	bool needDraw = true;
 
-	float radius = 0.5f;
+	float radius = 1.0f;
 
 	while(!glfwWindowShouldClose(window)){
 
 		_update_fps_counter(window);
 
+		glClearColor(0.87, 0.85, 0.75, 0.95);
 		//wipe the drawing surface clear
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		//resize openGL elements
@@ -343,9 +364,17 @@ int main(){
 
 		/* draw stuff here */
 		
-		float camX = sin(glfwGetTime()) * radius;
-		float camZ = cos(glfwGetTime()) * radius;
-		viewMatrix = glm::lookAt(glm::vec3(camX, 0.0f, camZ), cameraTarget, up);
+		//float camX = sin(glfwGetTime()) * radius;
+		//float camZ = cos(glfwGetTime()) * radius;
+		//glm::vec3 camPos = glm::vec3(camX, 0.0f, camZ);
+		//viewMatrix = glm::lookAt(camPos, cameraTarget, up);
+		//rotation around W axis
+		glm::mat4 rotationZW = glm::mat4(
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 1.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, cos(glfwGetTime()), -sin(glfwGetTime()),
+			0.0f, 0.0f, sin(glfwGetTime()), cos(glfwGetTime())
+		);
 
 		glUseProgram(shader_program);
 		// glUniform1f(glGetUniformLocation(shader_program, "iGlobalTime"), global_time);
@@ -353,7 +382,10 @@ int main(){
 		glUniformMatrix4fv(projMatLoc, 1, GL_FALSE, &projectionMatrix[0][0]);
 		glUniformMatrix4fv(viewMatLoc, 1, GL_FALSE, &viewMatrix[0][0]);
 		glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, &modelMatrix[0][0]);
+		glUniformMatrix4fv(rotationZWLoc, 1, GL_FALSE, &rotationZW[0][0]);
+		glUniformMatrix4fv(scaleMatLoc, 1, GL_FALSE, &scaleMatrix[0][0]);
 		glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
+		glUniform3f(cameraPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
 
 		glBindVertexArray(vao);
 		// draw 5-cell using index buffer

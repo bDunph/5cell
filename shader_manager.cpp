@@ -5,7 +5,7 @@
 #include "shader_manager.h"
 #include "log.h"
 
-bool load_shader(const char* filename, const char* &string){
+bool load_shader(const char* filename, char* &string){
 	//read shaders from file
 	FILE* f = fopen(filename, "r");
 
@@ -19,11 +19,11 @@ bool load_shader(const char* filename, const char* &string){
 	size_t size = ftell(f);
 
 	//calloc() initialises memory to zero
-	string = (const char*)calloc(sizeof(char), size + 1);
+	string = (char*)calloc(sizeof(char), size + 1);
 
 	rewind(f);
 	fread((void*)string, sizeof(char), size, f);
-	*(string + size + 1) = "\0";
+	*(string + size + 1) = '\0';
 	printf("%s\n", string);
 	return true;
 }
