@@ -110,17 +110,16 @@ int main(){
 
 	/* indices specifying 10 faces */
 	unsigned int indices [30] = {
-		0, 2, 1,
-		0, 1, 3,
+		4, 2, 3,
 		3, 0, 2,
-		2, 1, 3,
-		3, 2, 4,
-		4, 3, 1,
-		1, 2, 4,
-		4, 0, 1,
+		2, 0, 4,
 		4, 0, 3,
-		4, 0, 2
-		
+		3, 1, 0,
+		1, 4, 0,
+		0, 1, 2,
+		2, 3, 1,
+		1, 3, 4,
+		4, 2, 1	
 	};
 
 	//array of verts
@@ -163,6 +162,16 @@ int main(){
 		glm::vec4 vectorB = glm::vec4(vertC.x - vertB.x, vertC.y - vertB.y, vertC.z - vertB.z, vertC.w - vertB.w);
 		glm::vec4 vectorC = glm::vec4(vertA.x - vertC.x, vertA.y - vertC.y, vertA.z - vertC.z, vertA.w - vertC.w);
 
+		//calculate orthonormal basis for vectorA, B and C using Gram-Schmidt. We can then calculte
+		//the 4D normal
+		glm::vec4 u1 = glm::normalize(vectorA);
+		
+		glm::vec4 y2 = vectorB - ((glm::dot(vectorB, u1)) * u1);
+		glm::vec4 u2 = glm::normalize(y2);
+
+		glm::vec4 y3 = vectorC - ((glm::dot(vectorC, u2)) * u2);
+		glm::vec4 u3 = glm::normalize(y3);
+		
 		//calculate the  normal for each face
 	 	//using matrices and  Laplace expansion we can find the normal 
 		//vector in 4D given three input vectors	
@@ -176,7 +185,7 @@ int main(){
 		glm::vec4 back = glm::vec4(0.0, 0.0, 1.0, 0.0);	
 		glm::vec4 charm = glm::vec4(0.0, 0.0, 0.0, 1.0);	
 
-		glm::mat3 matA = glm::mat3(	vectorA.y, vectorB.y, vectorC.y,
+		/*glm::mat3 matA = glm::mat3(	vectorA.y, vectorB.y, vectorC.y,
 						vectorA.z, vectorB.z, vectorC.z,
 						vectorA.w, vectorB.w, vectorC.w);
 
@@ -190,7 +199,23 @@ int main(){
 	
 		glm::mat3 matD = glm::mat3(	vectorA.x, vectorB.x, vectorC.x,
 						vectorA.y, vectorB.y, vectorC.y,
-						vectorA.z, vectorB.z, vectorC.z);
+						vectorA.z, vectorB.z, vectorC.z);*/
+
+		glm::mat3 matA = glm::mat3(	u1.y, u2.y, u3.y,
+						u1.z, u2.z, u3.z,
+						u1.w, u2.w, u3.w);
+
+		glm::mat3 matB = glm::mat3(	u1.x, u2.x, u3.x,
+						u1.z, u2.z, u3.z,
+						u1.w, u2.w, u3.w);
+
+		glm::mat3 matC = glm::mat3(	u1.x, u2.x, u3.x,
+						u1.y, u2.y, u3.y,
+						u1.w, u2.w, u3.w);
+	
+		glm::mat3 matD = glm::mat3(	u1.x, u2.x, u3.x,
+						u1.y, u2.y, u3.y,
+						u1.z, u2.z, u3.z);	
 
 		float determinantA = glm::determinant(matA);	
 		float determinantB = glm::determinant(matB);	
@@ -301,7 +326,7 @@ int main(){
 	GLint rotationZWLoc = glGetUniformLocation(shader_program, "rotZW");
 	GLint scaleMatLoc = glGetUniformLocation(shader_program, "scaleMat");	
 	//view matrix setup
-	glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, -1.0f);
+	glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 0.5f);
 	glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
 	glm::vec3 cameraDirection = glm::normalize(cameraPos - cameraTarget);
 
@@ -325,7 +350,10 @@ int main(){
 
 	//uniforms
 	GLint lightPosLoc = glGetUniformLocation(shader_program, "lightPos");
-	glm::vec3 lightPos = glm::vec3(0.0, 1.0, -1.0); 
+	glm::vec3 lightPos = glm::vec3(0.0f, 1.0f, -0.2f); 
+
+	GLint light2PosLoc = glGetUniformLocation(shader_program, "light2Pos");
+	glm::vec3 lightPos2 = glm::vec3(0.0f, 1.0f, 0.5f);
 
 	GLint cameraPosLoc = glGetUniformLocation(shader_program, "camPos");
 
@@ -350,7 +378,9 @@ int main(){
 	//workaround for macOS Mojave bug
 	bool needDraw = true;
 
-	float radius = 1.0f;
+	float radius = 0.75f;
+
+	//glPointSize(4.0f);
 
 	while(!glfwWindowShouldClose(window)){
 
@@ -364,10 +394,10 @@ int main(){
 
 		/* draw stuff here */
 		
-		//float camX = sin(glfwGetTime()) * radius;
-		//float camZ = cos(glfwGetTime()) * radius;
-		//glm::vec3 camPos = glm::vec3(camX, 0.0f, camZ);
-		//viewMatrix = glm::lookAt(camPos, cameraTarget, up);
+		float camX = sin(glfwGetTime()) * radius;
+		float camZ = cos(glfwGetTime()) * radius;
+		glm::vec3 camPos = glm::vec3(camX, 0.0f, camZ);
+		viewMatrix = glm::lookAt(camPos, cameraTarget, cameraUp);
 		//rotation around W axis
 		glm::mat4 rotationZW = glm::mat4(
 			1.0f, 0.0f, 0.0f, 0.0f,
@@ -385,6 +415,7 @@ int main(){
 		glUniformMatrix4fv(rotationZWLoc, 1, GL_FALSE, &rotationZW[0][0]);
 		glUniformMatrix4fv(scaleMatLoc, 1, GL_FALSE, &scaleMatrix[0][0]);
 		glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
+		glUniform3f(light2PosLoc, lightPos2.x, lightPos2.y, lightPos2.z);
 		glUniform3f(cameraPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
 
 		glBindVertexArray(vao);
