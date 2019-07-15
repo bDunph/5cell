@@ -23,12 +23,74 @@
 int g_gl_width;
 int g_gl_height;
 
-//a call-back function
+//some global variables for Porcess input
+glm::vec3 cameraPos;
+glm::vec3 cameraFront;
+glm::vec3 cameraUp;
+float deltaTime = 0.0f;
+float lastFrame = 0.0f;
+
+//a call-back function for re-sizing the window
 void glfw_window_size_callback(GLFWwindow* window, int width, int height){
 	g_gl_width = width;
 	g_gl_height = height;
 
 	/* update any perspective matrices here */
+}
+
+float lastX, lastY;
+float pitch = 0.0f, yaw = 0.0f;
+bool firstMouse = true;
+
+//to keep track of mouse movement
+void mouse_callback(GLFWwindow* window, double xpos, double ypos){
+
+	if(firstMouse) // this bool variable is initially set to true
+	{
+    		lastX = xpos;
+    		lastY = ypos;
+    		firstMouse = false;
+	}
+	
+	float xOffset = xpos - lastX;
+	float yOffset = lastY - ypos;
+	lastX = xpos;
+	lastY = ypos;
+	
+	float sensitivity = 0.05f;
+	xOffset *= sensitivity;
+	yOffset *= sensitivity;	
+	
+	yaw += xOffset;
+	pitch += yOffset;
+	
+	if(pitch > 89.0f)
+  		pitch =  89.0f;
+	if(pitch < -89.0f)
+  		pitch = -89.0f; 
+
+	glm::vec3 front;
+    	front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+    	front.y = sin(glm::radians(pitch));
+    	front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+    	cameraFront = glm::normalize(front);	
+}
+
+void ProcessInput(GLFWwindow *window){
+	
+	float cameraSpeed = 2.5f * deltaTime; // adjust accordingly
+    	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        	cameraPos += cameraSpeed * cameraFront;
+    	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        	cameraPos -= cameraSpeed * cameraFront;
+    	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        	cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+    	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        	cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;	
+
+	if(GLFW_PRESS == glfwGetKey(window, GLFW_KEY_ESCAPE)){
+		glfwSetWindowShouldClose(window, 1);
+	}
 }
 
 int main(){
@@ -56,6 +118,9 @@ int main(){
 	g_gl_width = 640;//vmode->width;
 	g_gl_height = 480;//vmode->height;
 
+	lastX = 320.0f;
+	lastY = 240.0f;
+
 	GLFWwindow* window = glfwCreateWindow(g_gl_width, g_gl_height, "Extended GL Init", NULL, NULL);
 	if(!window){
 		fprintf(stderr, "ERROR: could not open window with GLFW3\n");
@@ -66,6 +131,9 @@ int main(){
 
 	//uncomment if you want to print the OpenGL parameters to the log file
 	// log_gl_params();
+
+	//setup for mouse camera control by disabling the cursor while the program is running 
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	//start GLEW extension handler
 	glewExperimental = GL_TRUE;
@@ -120,6 +188,19 @@ int main(){
 		2, 3, 1,
 		1, 3, 4,
 		4, 2, 1	
+	};
+
+	unsigned int lineIndices [20] = {
+		4, 2,
+		2, 3,
+		3, 4,
+		4, 0,
+		0, 2, 
+		0, 3,
+		3, 1,
+		1, 2,
+		4, 1,
+		1, 0
 	};
 
 	//array of verts
@@ -279,6 +360,11 @@ int main(){
 	glGenBuffers(1, &index);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 30 * sizeof(unsigned int), indices, GL_STATIC_DRAW);
+	
+	//GLuint lineIndex;
+	//glGenBuffers(1, &lineIndex);
+	//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lineIndex);
+	//glBufferData(GL_ELEMENT_ARRAY_BUFFER, 20 * sizeof(unsigned int), lineIndices, GL_STATIC_DRAW);
 
 	//load shaders
 	char* vertex_shader;
@@ -318,7 +404,7 @@ int main(){
 	glm::mat4 modelMatrix;
 
 	// projection matrix setup	
-	projectionMatrix = glm::perspective(60.0f, (float)g_gl_width / (float)g_gl_height, 0.1f, 100.0f);
+	projectionMatrix = glm::perspective(60.0f, (float)g_gl_width / (float)g_gl_height, 0.1f, 1000.0f);
 
 	GLint projMatLoc = glGetUniformLocation(shader_program, "projMat");
 	GLint viewMatLoc = glGetUniformLocation(shader_program, "viewMat");
@@ -326,25 +412,28 @@ int main(){
 	GLint rotationZWLoc = glGetUniformLocation(shader_program, "rotZW");
 	GLint scaleMatLoc = glGetUniformLocation(shader_program, "scaleMat");	
 	//view matrix setup
-	glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 0.5f);
-	glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
-	glm::vec3 cameraDirection = glm::normalize(cameraPos - cameraTarget);
+	//glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 0.5f);
+	//glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+	//glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
+	//glm::vec3 cameraDirection = glm::normalize(cameraPos - cameraTarget);
 
-	glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-	glm::vec3 cameraRight = glm::normalize(glm::cross(up, cameraDirection));
+	//glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+	//glm::vec3 cameraRight = glm::normalize(glm::cross(up, cameraDirection));
 	
-	glm::vec3 cameraUp = glm::cross(cameraDirection, cameraRight);
+	//glm::vec3 cameraUp = glm::cross(cameraDirection, cameraRight);
 
-	viewMatrix = glm::lookAt(cameraPos, cameraTarget, cameraUp);	
+	cameraPos = glm::vec3(0.0f, 0.0f, 0.0f);
+	cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+	cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
 	//model matrix
 	modelMatrix = glm::mat4(1.0f);
 
 	//scale matrix
 	glm::mat4 scaleMatrix = glm::mat4(
-		5.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 5.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 5.0f, 0.0f,
+		50.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 50.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 50.0f, 0.0f,
 		0.0f, 0.0f, 0.0f, 1.0f
 	);
 
@@ -356,15 +445,6 @@ int main(){
 	glm::vec3 lightPos2 = glm::vec3(0.0f, 1.0f, 0.5f);
 
 	GLint cameraPosLoc = glGetUniformLocation(shader_program, "camPos");
-
-	//GLint colour = glGetUniformLocation(shader_program, "inputColour");
-	//glUseProgram(shader_program);
-	//glUniform4f(colour, 0.5f, 0.0f, 0.5f, 1.0f);
-
-	//replacement for iResolution in mengerTest.frag
-	//GLint resolution = glGetUniformLocation(shader_program, "resolution");
-	//glUseProgram(shader_program);
-	//glUniform2f(resolution, (float)g_gl_width, (float)g_gl_height);
 
 	print_all(shader_program);
 
@@ -384,7 +464,12 @@ int main(){
 
 	while(!glfwWindowShouldClose(window)){
 
+		float currentFrame = glfwGetTime();
+		deltaTime = currentFrame - lastFrame;
+		
 		_update_fps_counter(window);
+		
+		ProcessInput(window);
 
 		glClearColor(0.87, 0.85, 0.75, 0.95);
 		//wipe the drawing surface clear
@@ -394,10 +479,13 @@ int main(){
 
 		/* draw stuff here */
 		
-		float camX = sin(glfwGetTime()) * radius;
-		float camZ = cos(glfwGetTime()) * radius;
-		glm::vec3 camPos = glm::vec3(camX, 0.0f, camZ);
-		viewMatrix = glm::lookAt(camPos, cameraTarget, cameraUp);
+		//float camX = sin(glfwGetTime()) * radius;
+		//float camZ = cos(glfwGetTime()) * radius;
+		//glm::vec3 camPos = glm::vec3(camX, 0.0f, camZ);
+		//viewMatrix = glm::lookAt(camPos, cameraTarget, cameraUp);
+
+		viewMatrix = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);	
+
 		//rotation around W axis
 		glm::mat4 rotationZW = glm::mat4(
 			1.0f, 0.0f, 0.0f, 0.0f,
@@ -421,6 +509,7 @@ int main(){
 		glBindVertexArray(vao);
 		// draw 5-cell using index buffer
 		glDrawElements(GL_TRIANGLES, 30 * sizeof(unsigned int), GL_UNSIGNED_INT, (void*)0);
+		//glDrawElements(GL_LINES, 20 * sizeof(unsigned int), GL_UNSIGNED_INT, (void*)0);
 		glBindVertexArray(0);
 
 		//update other events like input handling
@@ -437,12 +526,11 @@ int main(){
 		//put the stuff we've been drawing onto the display
 		glfwSwapBuffers(window);
 
-		if(GLFW_PRESS == glfwGetKey(window, GLFW_KEY_ESCAPE)){
-			glfwSetWindowShouldClose(window, 1);
-		}
-
+		glfwSetCursorPosCallback(window, mouse_callback);
 		glfwSetWindowSizeCallback(window, glfw_window_size_callback);
 		glfwSetErrorCallback(glfw_error_callback);
+		
+		lastFrame = currentFrame;
 	}
 
 	//close GL context and any other GL resources
